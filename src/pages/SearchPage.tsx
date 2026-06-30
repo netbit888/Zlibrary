@@ -4,7 +4,7 @@ import { Search, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FilterSidebar from "@/components/FilterSidebar";
 import BookCard from "@/components/BookCard";
-import { searchBooks, getCategories } from "@/store/useBookStore";
+import { searchBooks, getCategories } from "@/services/api";
 import type { Book } from "@/types";
 
 export default function SearchPage() {

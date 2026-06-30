@@ -3,7 +3,10 @@ import { BookOpen, TrendingUp } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import CategoryTag from "@/components/CategoryTag";
 import BookCard from "@/components/BookCard";
-import { getCategories, getPopularBooks } from "@/store/useBookStore";
+import {
+  getCategories,
+  getPopularBooks,
+} from "@/services/api";
 import type { Book } from "@/types";
 
 export default function HomePage() {

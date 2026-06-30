@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Calendar, BookOpen, Globe, Building, FileText } from "lucide-react";
 import StarRating from "@/components/StarRating";
 import DownloadButton from "@/components/DownloadButton";
-import { getBookById } from "@/store/useBookStore";
+import { getBookById } from "@/services/api";
 import type { Book } from "@/types";
 
 export default function BookDetailPage() {
