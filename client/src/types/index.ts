@@ -12,6 +12,9 @@ export interface Book {
   category: string;
   formats: ("pdf" | "epub" | "mobi")[];
   description: string;
+  pdf_url?: string;
+  epub_url?: string;
+  mobi_url?: string;
 }
 
 export interface SearchParams {

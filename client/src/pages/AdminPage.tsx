@@ -34,6 +34,9 @@ const defaultForm = {
   category: "",
   formats: [] as string[],
   description: "",
+  pdf_url: "",
+  epub_url: "",
+  mobi_url: "",
 };
 
 export default function AdminPage() {
@@ -102,6 +105,9 @@ export default function AdminPage() {
       category: book.category,
       formats: [...book.formats],
       description: book.description,
+      pdf_url: book.pdf_url || "",
+      epub_url: book.epub_url || "",
+      mobi_url: book.mobi_url || "",
     });
     setShowModal(true);
   };
@@ -168,9 +174,11 @@ export default function AdminPage() {
       const res = await adminUploadFile(file, "book");
       const ext = file.name.split(".").pop()?.toLowerCase();
       if (ext && ["pdf", "epub", "mobi"].includes(ext)) {
+        const urlKey = `${ext}_url`;
         setForm((prev) => ({
           ...prev,
           formats: prev.formats.includes(ext) ? prev.formats : [...prev.formats, ext],
+          [urlKey]: res.url,
         }));
       }
       alert(`上传成功: ${res.filename}`);

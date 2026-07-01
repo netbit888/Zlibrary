@@ -53,9 +53,24 @@ function createTables() {
       downloads INTEGER DEFAULT 0,
       category TEXT,
       formats TEXT,
-      description TEXT
+      description TEXT,
+      pdf_url TEXT,
+      epub_url TEXT,
+      mobi_url TEXT
     );
   `);
+
+  // 如果旧表没有新字段，添加它们
+  try {
+    db.run("ALTER TABLE books ADD COLUMN pdf_url TEXT");
+  } catch {}
+  try {
+    db.run("ALTER TABLE books ADD COLUMN epub_url TEXT");
+  } catch {}
+  try {
+    db.run("ALTER TABLE books ADD COLUMN mobi_url TEXT");
+  } catch {}
+
   console.log("[DB] 表结构已创建");
 }
 
@@ -112,6 +127,9 @@ function rowToBook(row: any): any {
     category: row[10],
     formats: (row[11] || "").split(",").filter(Boolean),
     description: row[12],
+    pdf_url: row[13] || "",
+    epub_url: row[14] || "",
+    mobi_url: row[15] || "",
   };
 }
 
@@ -120,7 +138,7 @@ export function getBookById(id: string): any | null {
   const result = stmt.getAsObject([id]);
   stmt.free();
   if (!result) return null;
-  const cols = ["id", "title", "author", "cover", "publisher", "year", "pages", "language", "rating", "downloads", "category", "formats", "description"];
+  const cols = ["id", "title", "author", "cover", "publisher", "year", "pages", "language", "rating", "downloads", "category", "formats", "description", "pdf_url", "epub_url", "mobi_url"];
   const row = cols.map((c) => result[c]);
   return rowToBook(row);
 }
@@ -216,10 +234,13 @@ export function createBook(data: {
   category?: string;
   formats?: string;
   description?: string;
+  pdf_url?: string;
+  epub_url?: string;
+  mobi_url?: string;
 }): number {
   const stmt = db.prepare(
-    `INSERT INTO books (title, author, cover, publisher, year, pages, language, rating, downloads, category, formats, description)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO books (title, author, cover, publisher, year, pages, language, rating, downloads, category, formats, description, pdf_url, epub_url, mobi_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   stmt.run([
     data.title,
@@ -234,6 +255,9 @@ export function createBook(data: {
     data.category || "",
     data.formats || "",
     data.description || "",
+    data.pdf_url || "",
+    data.epub_url || "",
+    data.mobi_url || "",
   ]);
   stmt.free();
   const id = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
@@ -256,6 +280,9 @@ export function updateBook(
     category: string;
     formats: string;
     description: string;
+    pdf_url: string;
+    epub_url: string;
+    mobi_url: string;
   }>
 ): boolean {
   const cols: Array<[string, any]> = [
@@ -271,6 +298,9 @@ export function updateBook(
     ["category", data.category],
     ["formats", data.formats],
     ["description", data.description],
+    ["pdf_url", data.pdf_url],
+    ["epub_url", data.epub_url],
+    ["mobi_url", data.mobi_url],
   ];
 
   const fields = cols.filter(([, v]) => v !== undefined).map(([col]) => `${col} = ?`);
@@ -287,6 +317,14 @@ export function updateBook(
 
 export function deleteBook(id: string): boolean {
   const stmt = db.prepare("DELETE FROM books WHERE id = ?");
+  stmt.run([id]);
+  stmt.free();
+  saveDb();
+  return true;
+}
+
+export function incrementDownloads(id: string): boolean {
+  const stmt = db.prepare("UPDATE books SET downloads = downloads + 1 WHERE id = ?");
   stmt.run([id]);
   stmt.free();
   saveDb();

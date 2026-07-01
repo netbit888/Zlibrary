@@ -83,9 +83,8 @@ export async function adminDeleteBook(id: string): Promise<{ success: boolean }>
 export async function adminUploadFile(file: File, type: "cover" | "book"): Promise<{ url: string; filename: string; size: number }> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("type", type);
   const token = getAdminToken();
-  const res = await fetch(API_BASE + "/admin/upload", {
+  const res = await fetch(API_BASE + "/admin/upload?type=" + type, {
     method: "POST",
     headers: token ? { "x-admin-token": token } : {},
     body: formData,

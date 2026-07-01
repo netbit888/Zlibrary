@@ -13,13 +13,15 @@ import {
   createBook,
   updateBook,
   deleteBook,
+  incrementDownloads,
 } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "client", "public");
-const COVERS_DIR = path.join(PUBLIC_DIR, "covers");
-const BOOKS_DIR = path.join(PUBLIC_DIR, "books");
+const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
+const COVERS_DIR = path.join(DATA_DIR, "covers");
+const BOOKS_DIR = path.join(DATA_DIR, "books");
 
 if (!fs.existsSync(COVERS_DIR)) fs.mkdirSync(COVERS_DIR, { recursive: true });
 if (!fs.existsSync(BOOKS_DIR)) fs.mkdirSync(BOOKS_DIR, { recursive: true });
@@ -31,14 +33,17 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
 app.use(cors());
 app.use(express.json());
 
+app.use("/covers", express.static(COVERS_DIR));
+app.use("/books", express.static(BOOKS_DIR));
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const type = (req.body as any).type || "cover";
+  destination: (req, _file, cb) => {
+    const type = (req.query as any).type || "cover";
     const dir = type === "book" ? BOOKS_DIR : COVERS_DIR;
     cb(null, dir);
   },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
+  filename: (_req, _file, cb) => {
+    const ext = path.extname(_file.originalname);
     const name = Date.now() + "_" + Math.round(Math.random() * 1e9) + ext;
     cb(null, name);
   },
@@ -101,6 +106,30 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", db: "sqlite" });
 });
 
+app.get("/api/books/:id/download/:format", (req, res) => {
+  const { id, format } = req.params;
+  console.log(`[DOWNLOAD] id=${id}, format=${format}`);
+  const book = getBookById(id);
+  if (!book) {
+    console.log(`[DOWNLOAD] 书籍未找到: ${id}`);
+    return res.status(404).json({ error: "书籍未找到" });
+  }
+  console.log(`[DOWNLOAD] book:`, book);
+  const urlKey = `${format}_url`;
+  const fileUrl = (book as any)[urlKey];
+  console.log(`[DOWNLOAD] urlKey=${urlKey}, fileUrl=${fileUrl}`);
+  if (!fileUrl) {
+    return res.status(404).json({ error: "该格式文件不存在" });
+  }
+  const filePath = path.join(BOOKS_DIR, path.basename(fileUrl));
+  console.log(`[DOWNLOAD] filePath=${filePath}, exists=${fs.existsSync(filePath)}`);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "文件不存在" });
+  }
+  incrementDownloads(id);
+  res.download(filePath, `${book.title}.${format}`);
+});
+
 // ========== 管理员接口 ==========
 
 app.post("/api/admin/login", (req, res) => {
@@ -136,6 +165,9 @@ app.post("/api/admin/books", authAdmin, (req, res) => {
     category,
     formats,
     description,
+    pdf_url,
+    epub_url,
+    mobi_url,
   } = req.body;
 
   if (!title || !author) {
@@ -155,6 +187,9 @@ app.post("/api/admin/books", authAdmin, (req, res) => {
     category: category || "",
     formats: Array.isArray(formats) ? formats.join(",") : formats || "",
     description: description || "",
+    pdf_url: pdf_url || "",
+    epub_url: epub_url || "",
+    mobi_url: mobi_url || "",
   });
 
   res.json({ id, success: true });
@@ -178,7 +213,7 @@ app.post("/api/admin/upload", authAdmin, upload.single("file"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "未上传文件" });
   }
-  const type = req.body.type || "cover";
+  const type = (req.query as any).type || "cover";
   const url = type === "book" ? `/books/${req.file.filename}` : `/covers/${req.file.filename}`;
   res.json({ url, filename: req.file.filename, size: req.file.size });
 });

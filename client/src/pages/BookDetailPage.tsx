@@ -132,7 +132,7 @@ export default function BookDetailPage() {
             <h3 className="font-display font-bold text-ink mb-3 text-lg">
               下载
             </h3>
-            <DownloadButton formats={book.formats} title={book.title} />
+            <DownloadButton formats={book.formats} title={book.title} bookId={book.id} pdf_url={book.pdf_url} epub_url={book.epub_url} mobi_url={book.mobi_url} />
           </div>
         </div>
       </div>
