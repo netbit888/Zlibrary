@@ -68,9 +68,6 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <p className="text-xs text-ink/40 text-center mt-6">
-            默认密码: admin123
-          </p>
         </div>
       </div>
     </div>
