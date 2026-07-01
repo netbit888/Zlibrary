@@ -25,7 +25,7 @@ export default function BookCard({ book, index = 0 }: BookCardProps) {
           />
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
             <Download className="w-3 h-3" />
-            {(book.downloads / 1000).toFixed(0)}k
+            {book.downloads}
           </div>
         </div>
         <div className="p-4">

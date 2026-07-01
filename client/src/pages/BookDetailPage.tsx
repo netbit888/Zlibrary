@@ -85,7 +85,7 @@ export default function BookDetailPage() {
               {book.category}
             </span>
             <span className="text-xs text-ink/40">
-              {(book.downloads / 1000).toFixed(0)}k 次下载
+              {book.downloads} 次下载
             </span>
           </div>
 
