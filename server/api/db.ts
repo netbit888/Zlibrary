@@ -5,13 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_FILE = path.resolve(__dirname, "..", "data", "zlibrary.db");
+const DB_FILE = path.resolve(__dirname, "..", "..", "data", "zlibrary.db");
 const DB_DIR = path.dirname(DB_FILE);
 
 let db: any = null;
 
 export async function initDb() {
-  const wasmPath = path.resolve(__dirname, "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm");
+  const wasmPath = path.resolve(__dirname, "..", "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm");
   const SQL = await initSqlJs({
     locateFile: () => wasmPath,
   });

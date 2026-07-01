@@ -17,7 +17,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
+const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "client", "public");
 const COVERS_DIR = path.join(PUBLIC_DIR, "covers");
 const BOOKS_DIR = path.join(PUBLIC_DIR, "books");
 
