@@ -19,6 +19,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "client", "public");
+const DIST_DIR = path.resolve(__dirname, "..", "..", "dist");
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
 const COVERS_DIR = path.join(DATA_DIR, "covers");
 const BOOKS_DIR = path.join(DATA_DIR, "books");
@@ -35,6 +36,13 @@ app.use(express.json());
 
 app.use("/covers", express.static(COVERS_DIR));
 app.use("/books", express.static(BOOKS_DIR));
+
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(DIST_DIR, "index.html"));
+  });
+}
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {

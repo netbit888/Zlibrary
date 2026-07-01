@@ -1,5 +1,5 @@
-// 开发环境走 Vite 代理（同源），生产环境使用环境变量中的 API 地址
-const API_BASE = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL || "") + "/api";
+// 开发环境走 Vite 代理，生产环境用同源
+const API_BASE = import.meta.env.DEV ? "/api" : "";
 
 export interface Book {
   id: string;

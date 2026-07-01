@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: zlibrary
+    env: node
+    region: oregon
+    buildCommand: npm run build
+    startCommand: npx tsx server/api/server.ts
+    envVars:
+      - key: ADMIN_PASSWORD
+        value: zlibrary
+      - key: NODE_ENV
+        value: production
+    disk:
+      - name: data
+        mountPath: /app/data
+        sizeGB: 1
