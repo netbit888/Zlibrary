@@ -164,7 +164,7 @@ ADMIN_PASSWORD=your_secure_password
 ## 管理员使用
 
 1. 访问 `/admin/login` 进入管理员登录页面
-2. 输入密码登录（默认密码：`admin123`）
+2. 输入密码登录（默认密码：`admin`）
 3. 进入管理后台进行书籍管理
 
 ### 管理后台功能
