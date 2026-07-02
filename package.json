@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n SERVER,WEB -c yellow,cyan \"npm:dev:server\" \"npm:dev:web\"",
     "dev:web": "vite",
-    "dev:server": "set ADMIN_PASSWORD=zlibrary&& tsx watch server/api/server.ts",
+    "dev:server": "node -r dotenv/config tsx watch server/api/server.ts",
     "build": "npm run build:web",
     "build:web": "vite build",
     "lint": "eslint .",
@@ -37,6 +37,7 @@
     "babel-plugin-react-dev-locator": "^1.0.0",
     "concurrently": "^10.0.3",
     "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
