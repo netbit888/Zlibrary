@@ -1,7 +1,7 @@
-// 开发环境走 Vite 代理，生产环境用 Cloudflare Worker
+// 开发环境走 Vite 代理，生产环境同源（Pages Functions 部署在 /api/*）
 const API_BASE = import.meta.env.DEV
   ? "/api"
-  : (import.meta.env.VITE_API_BASE || "https://zlibrary-api.zlibrary2026.workers.dev");
+  : "/api";
 
 export interface Book {
   id: string;

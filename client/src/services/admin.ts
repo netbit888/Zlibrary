@@ -1,7 +1,7 @@
-// 开发环境走 Vite 代理（同级），生产环境走绝对地址（Cloudflare Worker）
+// 开发环境走 Vite 代理，生产环境同源（Pages Functions 部署在 /api/*）
 const API_BASE = import.meta.env.DEV
   ? "/api"
-  : (import.meta.env.VITE_API_BASE || "https://zlibrary-api.zlibrary2026.workers.dev");
+  : "/api";
 
 const ADMIN_TOKEN_KEY = "zlib_admin_token";
 
@@ -42,8 +42,14 @@ export async function adminLogin(password: string): Promise<{ token: string; suc
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "登录失败");
+  const text = await res.text();
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`登录接口返回非 JSON 数据 (${res.status}): ${text.slice(0, 80)}`);
+  }
+  if (!res.ok) throw new Error(data.error || `登录失败: ${res.status}`);
   return data;
 }
 

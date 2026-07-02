@@ -25,8 +25,7 @@ async function readFileFromKV(key: string, env: Env): Promise<{ body: ArrayBuffe
   return { body: file, contentType };
 }
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+export async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -266,7 +265,11 @@ export default {
     } catch (err: any) {
       return json({ error: err.message }, 500);
     }
-  },
+}
+
+// 兼容旧的 Worker 部署（直接 wrangler deploy）
+export default {
+  fetch: handleRequest,
 };
 
 function rowToBook(row: any): any {
