@@ -56,7 +56,7 @@ const storage = multer.diskStorage({
     cb(null, name);
   },
 });
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 25 * 1024 * 1024 } });
 
 // 简单认证中间件
 function authAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {

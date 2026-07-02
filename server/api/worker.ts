@@ -23,7 +23,7 @@ export const onRequest = createPagesHandler({
 
     try {
       if (path === '/api/health') {
-        return new Response(JSON.stringify({ status: 'ok', db: 'd1' }), {
+        return new Response(JSON.stringify({ status: 'ok', db: 'd1', storage: 'kv' }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
@@ -52,6 +52,24 @@ export const onRequest = createPagesHandler({
         });
       }
 
+      // 静态文件代理 - 通过 KV 读取
+      if (path.startsWith('/api/files/')) {
+        const key = decodeURIComponent(path.replace('/api/files/', ''));
+        const file = await env.FILES_KV.get(key, { type: 'arrayBuffer' });
+        if (!file) {
+          return new Response(JSON.stringify({ error: '文件不存在' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+        }
+        const meta = await env.FILES_KV.getWithMetadata(key);
+        const contentType = (meta?.metadata as any)?.contentType || 'application/octet-stream';
+        return new Response(file, {
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=31536000',
+            ...corsHeaders,
+          },
+        });
+      }
+
       if (path.startsWith('/api/books/') && path.includes('/download/')) {
         const parts = path.split('/');
         const id = parts[3];
@@ -65,14 +83,18 @@ export const onRequest = createPagesHandler({
         if (!fileUrl) {
           return new Response(JSON.stringify({ error: '该格式文件不存在' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
         }
-        const file = await env.FILES_BUCKET.get(fileUrl.split('/').pop()!);
+        // fileUrl 形如 /books/时间戳_xxx.pdf，需要从 KV 中读取
+        const key = fileUrl.replace(/^\//, '');
+        const file = await env.FILES_KV.get(key, { type: 'arrayBuffer' });
         if (!file) {
           return new Response(JSON.stringify({ error: '文件不存在' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
         }
         await env.DB.prepare('UPDATE books SET downloads = downloads + 1 WHERE id = ?').bind(id).run();
-        return new Response(file.body, {
+        const meta = await env.FILES_KV.getWithMetadata(key);
+        const contentType = (meta?.metadata as any)?.contentType || 'application/octet-stream';
+        return new Response(file, {
           headers: {
-            'Content-Type': file.httpMetadata?.contentType || 'application/octet-stream',
+            'Content-Type': contentType,
             'Content-Disposition': `attachment; filename="${bookResult.title}.${format}"`,
             ...corsHeaders,
           },
@@ -285,12 +307,22 @@ export const onRequest = createPagesHandler({
           });
         }
 
+        // KV 单个值最大 25MB
+        const MAX_SIZE = 25 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          return new Response(JSON.stringify({ error: `文件超过 25MB 限制（当前 ${(file.size / 1024 / 1024).toFixed(2)}MB）` }), {
+            status: 413,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
+
         const ext = file.name.split('.').pop()?.toLowerCase() || '';
         const filename = `${Date.now()}_${Math.round(Math.random() * 1e9)}.${ext}`;
         const prefix = type === 'book' ? 'books' : 'covers';
+        const key = `${prefix}/${filename}`;
 
-        await env.FILES_BUCKET.put(filename, file.stream(), {
-          httpMetadata: { contentType: file.type },
+        await env.FILES_KV.put(key, file.stream(), {
+          metadata: { contentType: file.type, originalName: file.name },
         });
 
         const urlPath = `/${prefix}/${filename}`;
