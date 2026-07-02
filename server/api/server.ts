@@ -47,9 +47,6 @@ app.use("/books", express.static(BOOKS_DIR));
 
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(DIST_DIR, "index.html"));
-  });
 }
 
 const storage = multer.diskStorage({
@@ -233,6 +230,13 @@ app.post("/api/admin/upload", authAdmin, upload.single("file"), (req, res) => {
   const url = type === "book" ? `/books/${req.file.filename}` : `/covers/${req.file.filename}`;
   res.json({ url, filename: req.file.filename, size: req.file.size });
 });
+
+// SPA fallback - 必须在所有 API 路由之后
+if (fs.existsSync(DIST_DIR)) {
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(DIST_DIR, "index.html"));
+  });
+}
 
 async function start() {
   await initDb();
