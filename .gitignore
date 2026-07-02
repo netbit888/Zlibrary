@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Wrangler (Cloudflare)
+.wrangler
+
+# 本地数据库和上传文件
+data/
+client/public/covers/
+client/public/books/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

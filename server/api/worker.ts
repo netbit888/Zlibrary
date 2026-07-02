@@ -259,7 +259,7 @@ export default {
           metadata: { contentType: file.type, originalName: file.name },
         });
 
-        return json({ url: `/${prefix}/${filename}`, filename, size: file.size });
+        return json({ url: `/api/files/${prefix}/${filename}`, filename, size: file.size });
       }
 
       return new Response('Not Found', { status: 404, headers: corsHeaders });

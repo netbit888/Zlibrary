@@ -1,5 +1,7 @@
-// 开发环境走 Vite 代理（同源），生产环境走绝对地址
-const API_BASE = import.meta.env.DEV ? "/api" : "";
+// 开发环境走 Vite 代理（同级），生产环境走绝对地址（Cloudflare Worker）
+const API_BASE = import.meta.env.DEV
+  ? "/api"
+  : (import.meta.env.VITE_API_BASE || "https://zlibrary-api.zlibrary2026.workers.dev");
 
 const ADMIN_TOKEN_KEY = "zlib_admin_token";
 

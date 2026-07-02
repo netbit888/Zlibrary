@@ -12,7 +12,9 @@
     "build:server": "tsc -p tsconfig.server.json",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check": "tsc -b --noEmit"
+    "check": "tsc -b --noEmit",
+    "deploy:web": "npm run build:web && wrangler pages deploy dist --project-name=zlibrary --branch=main --commit-dirty=true",
+    "deploy:api": "wrangler deploy"
   },
   "dependencies": {
     "clsx": "^2.1.1",

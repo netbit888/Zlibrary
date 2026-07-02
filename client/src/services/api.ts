@@ -1,5 +1,7 @@
-// 开发环境走 Vite 代理，生产环境用同源
-const API_BASE = import.meta.env.DEV ? "/api" : "";
+// 开发环境走 Vite 代理，生产环境用 Cloudflare Worker
+const API_BASE = import.meta.env.DEV
+  ? "/api"
+  : (import.meta.env.VITE_API_BASE || "https://zlibrary-api.zlibrary2026.workers.dev");
 
 export interface Book {
   id: string;
