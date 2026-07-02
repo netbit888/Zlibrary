@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n SERVER,WEB -c yellow,cyan \"npm:dev:server\" \"npm:dev:web\"",
     "dev:web": "vite",
-    "dev:server": "node -r dotenv/config tsx watch server/api/server.ts",
+    "dev:server": "tsx watch server/api/server.ts",
     "build": "npm run build:web",
     "build:web": "vite build",
     "lint": "eslint .",
@@ -41,7 +41,7 @@
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
-    "express": "^5.2.1",
+    "express": "^4.21.0",
     "globals": "^16.0.0",
     "multer": "^2.2.0",
     "postcss": "^8.5.3",

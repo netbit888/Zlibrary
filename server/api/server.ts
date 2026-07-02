@@ -4,6 +4,16 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+import dotenv from "dotenv";
+const envPath = path.resolve(__dirname, "..", "..", ".env");
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
+
 import {
   initDb,
   searchBooks,
@@ -16,8 +26,6 @@ import {
   incrementDownloads,
 } from "./db.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "client", "public");
 const DIST_DIR = path.resolve(__dirname, "..", "..", "dist");
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
