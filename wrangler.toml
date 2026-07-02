@@ -1,10 +1,5 @@
-name = "zlibrary-api"
-main = "server/api/worker.ts"
-compatibility_date = "2024-07-01"
+name = "zlibrary"
 pages_build_output_dir = "dist"
-
-[build]
-command = "npm run build"
 
 [[d1_databases]]
 binding = "DB"
