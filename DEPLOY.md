@@ -1,224 +1,233 @@
-# Zlibrary 免费部署指南（Cloudflare Pages + Workers）
+# Zlibrary 部署指南
 
-本指南将帮助你把 Zlibrary 网站部署到公网，**全程免费、无需绑卡**。
+把项目部署到 Cloudflare Pages，**全程免费、无需绑卡**。
 
 ## 架构概览
 
 ```
-用户访问: zlibrary.pages.dev (前端)
-用户访问: zlibrary-api.xxx.workers.dev (后端 API)
-    │
-    ├── Cloudflare Pages  →  前端静态页面 (dist/)
-    ├── Cloudflare Workers →  后端 API (server/api/worker.ts)
-    ├── Cloudflare D1      →  替代 SQLite 数据库（5GB 免费）
-    └── Cloudflare KV      →  存储封面和电子书文件（1GB 免费）
+前端 + 后端 → Cloudflare Pages
+              ├── 静态资源 (dist/)   → 浏览器直接加载
+              ├── /api/*             → Pages Functions (functions/api/[[path]].ts)
+              ├── Cloudflare D1      → 书籍元数据 (5GB 免费)
+              └── Cloudflare KV      → 封面与电子书文件 (1GB 免费)
+自动构建     →  GitHub push → Cloudflare Pages build → 自动部署
 ```
 
-## 为什么选择这个方案？
+所有组件都在 Cloudflare 生态内：
+- 前后端同源，无 CORS / `*.workers.dev` 被墙的问题
+- D1 每天 500 万次读、10 万次写
+- KV 每天 10 万次读、1 万次写
+- Functions 每天 10 万次请求
 
-| 平台 | 免费额度 | 是否需绑卡 | 数据库 | 文件存储 |
-|------|----------|-----------|--------|----------|
-| Vercel + Cloudflare R2 | 较少 | **是** | D1 | R2 |
-| Render | 750小时/月 | **是** | 磁盘 | 磁盘 |
-| **Cloudflare 全家桶** | **充足** | **否** | **D1** | **KV** |
+## 为什么选这个方案
 
-Cloudflare 是唯一一个**完全不需要绑卡**且能跑后端 + 数据库 + 文件存储的方案。
+| 平台 | 需绑卡 | 数据库 | 文件存储 | 后端 |
+|------|--------|--------|----------|------|
+| Vercel + R2 | **是** | 外部 | R2 | Serverless |
+| Render | **是** | 磁盘 | 磁盘 | 长驻进程 |
+| **Cloudflare 全家桶** | **否** | **D1** | **KV** | **Pages Functions** |
+
+Cloudflare 是**唯一完全免绑卡**且能跑完整后端的方案。
 
 ## 文件大小限制
 
-- **单文件最大 25MB**（Cloudflare KV 限制）
-- 适合绝大多数 PDF/EPUB 电子书
-- mobi 格式文件通常远小于 25MB
+**单文件 ≤ 25MB**（KV 限制）。绝大多数 PDF / EPUB / MOBI 都在此范围内。
 
-## 步骤 1: 安装 Wrangler（Cloudflare CLI）
+---
+
+## 部署步骤
+
+### 前置准备
+
+- Cloudflare 账号（<https://dash.cloudflare.com/sign-up>，无需绑卡）
+- 已安装 Node.js ≥ 18
+- 项目已 push 到 GitHub
+
+### 步骤 1: 安装 Wrangler 并登录
 
 ```bash
 npm install -g wrangler
-
-# 登录（会打开浏览器授权）
 wrangler login
 ```
 
-## 步骤 2: 创建 D1 数据库
+浏览器会跳到 Cloudflare 授权。
+
+### 步骤 2: 创建 D1 数据库
 
 ```bash
-# 创建数据库
 wrangler d1 create zlibrary-db
-
-# 输出会包含 database_id，把它复制出来
-# 填到 wrangler.toml 的 database_id = "xxx" 位置
 ```
 
-## 步骤 3: 创建 KV 命名空间
+输出形如：
+
+```
+[[d1_databases]]
+binding = "DB"
+database_name = "zlibrary-db"
+database_id = "xxxx-xxxx-xxxx"
+```
+
+把 `database_id` 填到项目 `wrangler.toml` 的 `[[d1_databases]]` 段。
+
+### 步骤 3: 创建 KV 命名空间
 
 ```bash
-# 创建 KV 命名空间用于存储文件
 wrangler kv namespace create FILES_KV
-
-# 输出会包含 id，把它复制出来
-# 填到 wrangler.toml 的 id = "xxx" 位置
 ```
 
-## 步骤 4: 初始化 D1 数据库表
+输出形如：
 
-创建 `schema.sql`：
-
-```sql
-CREATE TABLE IF NOT EXISTS books (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  author TEXT NOT NULL,
-  cover TEXT,
-  publisher TEXT,
-  year INTEGER,
-  pages INTEGER,
-  language TEXT DEFAULT '中文',
-  rating REAL DEFAULT 0,
-  downloads INTEGER DEFAULT 0,
-  category TEXT,
-  formats TEXT,
-  description TEXT,
-  pdf_url TEXT,
-  epub_url TEXT,
-  mobi_url TEXT
-);
-
--- 初始化一些示例数据
-INSERT INTO books (title, author, cover, publisher, year, pages, language, rating, downloads, category, formats, description)
-VALUES
-  ('百年孤独', '加西亚·马尔克斯', '/api/files/covers/sample.jpg', '南海出版公司', 2011, 360, '中文', 4.9, 125000, '文学', 'pdf,epub,mobi', '《百年孤独》是魔幻现实主义文学的代表作。'),
-  ('三体', '刘慈欣', '/api/files/covers/sample.jpg', '重庆出版社', 2008, 302, '中文', 4.8, 210000, '科技', 'pdf,epub,mobi', '文化大革命期间军方探寻外星文明的绝秘计划。');
+```
+[[kv_namespaces]]
+binding = "FILES_KV"
+id = "yyyyyyyy"
 ```
 
-执行：
+把 `id` 填到 `wrangler.toml` 的 `[[kv_namespaces]]` 段。
+
+### 步骤 4: 初始化 D1 表结构
+
+执行 `schema.sql`：
 
 ```bash
 wrangler d1 execute zlibrary-db --file=./schema.sql
 ```
 
-## 步骤 5: 部署后端 API（Worker）
+这会创建 `books` 表并插入示例数据。
 
-```bash
-# 部署到 Cloudflare
-wrangler deploy
-```
+### 步骤 5: 在 Cloudflare Dashboard 创建 Pages 项目
 
-部署成功后会输出：
-```
-Published zlibrary-api (x.xx sec)
-  https://zlibrary-api.your-subdomain.workers.dev
-```
+1. <https://dash.cloudflare.com> → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
+2. 选 **GitHub** → 授权 Cloudflare 访问你的 GitHub
+3. 选仓库 `netbit888/Zlibrary`（或你的 fork）
+4. **Project name**：填 `zlibrary`（决定域名 `zlibrary.pages.dev`）
+5. **Production branch**：选你的主分支（默认 `main`，本项目用 `Render-一站式部署`）
+6. **Build settings**：
+   - Framework preset: **Vite**
+   - Build command: `npm run build`
+   - Build output directory: `dist`
+7. 点 **Save and Deploy**
 
-把这个域名记下来，前端需要配置。
+第一次会自动 build，可能失败（因为 bindings 还没配），正常。
 
-## 步骤 6: 部署前端（Cloudflare Pages）
+### 步骤 6: 配置 Pages 项目 Bindings
 
-### 方式 A：通过 Git 集成（推荐）
+进入 Pages 项目 → **Settings** → **Functions** → **Bindings** → **Add**：
 
-1. 把项目推送到 GitHub
-2. 访问 [Cloudflare Dashboard](https://dash.cloudflare.com) → Pages
-3. 点击 "Create a project" → "Connect to Git"
-4. 选择你的仓库
-5. 配置构建设置：
+| 类型 | Variable name | 选择 / 值 |
+|------|---------------|-----------|
+| **D1 database** | `DB` | 选 `zlibrary-db` |
+| **KV namespace** | `FILES_KV` | 选你刚创建的 namespace |
+| **Environment variables** | `ADMIN_PASSWORD` | `zlibrary`（或自定义强密码） |
 
-| 设置 | 值 |
-|------|-----|
-| Framework preset | Vite |
-| Build command | `npm run build:web` |
-| Build output directory | `dist` |
+> **作用域**：注意是 **Production** 标签下，**不是 Preview**。绑定时如果看到 Production / Preview 切换，要选 Production。
 
-6. 点击 "Save and Deploy"
+### 步骤 7: 触发重新部署
 
-### 方式 B：通过 Wrangler 直接部署
+回到 **Deployments** 标签 → 找到最新那条 → 右上角 **Retry deployment**。
 
-```bash
-# 先构建前端
-npm run build:web
+这次会成功：build → Functions bundle 包含 `functions/api/[[path]].ts` → 拿到 D1 / KV / `ADMIN_PASSWORD` bindings → 部署完成。
 
-# 部署到 Pages
-wrangler pages deploy dist --project-name=zlibrary
-```
+### 步骤 8: 验证
 
-## 步骤 7: 配置前端 API 地址
+打开 `https://<your-project>.pages.dev`：
 
-修改 `client/src/services/api.ts` 和 `client/src/services/admin.ts`：
-
-```typescript
-// 把
-const API_BASE = import.meta.env.DEV ? "/api" : "";
-// 改为
-const API_BASE = import.meta.env.DEV 
-  ? "/api" 
-  : "https://zlibrary-api.your-subdomain.workers.dev";
-```
-
-或者用环境变量，在 Cloudflare Pages 设置 `VITE_API_BASE`。
-
-## 步骤 8: 配置 CORS
-
-后端 Worker 已配置 CORS 允许所有来源（`*`），如需限制可修改 `worker.ts` 中的 `corsHeaders`。
-
-## 步骤 9: 验证部署
-
-访问你的 Pages 域名，测试：
-- [ ] 首页正常加载
-- [ ] 搜索功能正常
-- [ ] 图书详情页正常
-- [ ] 登录后台（密码：`zlibrary`，可在 Cloudflare Dashboard 修改）
-- [ ] 上传文件功能正常
-- [ ] 下载功能正常
-
-## 修改管理员密码
-
-在 Cloudflare Dashboard：
-1. Workers & Pages → zlibrary-api → Settings → Variables
-2. 修改 `ADMIN_PASSWORD` 的值
-3. 保存后会自动重新部署
-
-## 免费额度
-
-Cloudflare 免费版：
-- **Pages**: 无限请求，无限带宽
-- **Workers**: 10万请求/天
-- **D1**: 5GB 存储，500万次读/天，10万次写/天
-- **KV**: 1GB 存储，10万次读/天，1万次写/天
-
-对个人项目绰绰有余。
-
-## 常见问题
-
-### Q: KV 的 25MB 限制怎么解决？
-A: 大文件可以先压缩（zip 格式的电子书），或拆分上传。绝大多数电子书都在 25MB 以下。
-
-### Q: 如何备份数据？
-A: 
-```bash
-# 备份 D1
-wrangler d1 export zlibrary-db --output=backup.sql
-
-# KV 数据需要单独处理（不提供导出工具，但文件本身在 KV 中）
-```
-
-### Q: 本地开发怎么办？
-A: 本地继续用 `npm run dev`，数据库是本地 SQLite，文件存在 `data/` 目录，部署到 Cloudflare 才用 D1 + KV。
-
-### Q: 如何更新部署？
-A:
-- 前端：推送到 GitHub 后 Pages 自动部署
-- 后端：运行 `wrangler deploy`
-
-## 项目结构
-
-| 目录/文件 | 用途 |
-|----------|------|
-| server/api/server.ts | 本地开发用的 Express 后端 |
-| server/api/worker.ts | Cloudflare Workers 部署用的后端 |
-| server/api/db.ts | SQLite 数据库操作（本地用） |
-| client/ | 前端 React 代码 |
-| data/ | 本地数据目录（开发用） |
-| dist/ | 前端构建输出 |
-| wrangler.toml | Cloudflare Workers 配置 |
+- [ ] 首页加载并显示热门书籍
+- [ ] 搜索能返回结果
+- [ ] 书籍详情页能进
+- [ ] `/admin/login` 用 `ADMIN_PASSWORD` 登录成功
+- [ ] 上传封面 / 文件功能正常
+- [ ] 下载电子书功能正常
 
 ---
 
-完成！访问你的 Pages 域名即可使用。
+## 日常开发流程
+
+```bash
+# 本地改代码
+npm run dev
+
+# 类型检查
+npm run check
+
+# 提交
+git add -A
+git commit -m "feat: ..."
+
+# 推送触发自动部署
+git push origin <branch>
+```
+
+Cloudflare 检测到 push → 自动 build → 1-2 分钟内 production 域名更新。
+
+---
+
+## 修改管理员密码
+
+Cloudflare Dashboard → Workers & Pages → 你的 Pages 项目 → Settings → Functions → Bindings → 找到 `ADMIN_PASSWORD` → 编辑 → 保存。
+
+下次部署生效（push 一次触发，或手动 Retry deployment）。
+
+---
+
+## 故障排查
+
+### 部署后 `/api/*` 返回 404
+
+Functions bundle 没生效。检查：
+
+1. `functions/api/[[path]].ts` 是否在 Git 仓库里（注意文件名是双中括号）
+2. `wrangler.toml` 里有 `pages_build_output_dir = "dist"`
+3. build 日志里有 `Uploading Functions bundle` 字样
+
+### `Failed to execute 'json' on 'Response'`
+
+后端没返回 JSON。检查：
+
+1. 浏览器控制台 Network，看 `/api/admin/login` 响应的 status 和 body
+2. 后端 catch 块会返回 `{ error: "..." }`，但前面路由出错可能返回 404 纯文本
+3. 如果完全连不上后端，可能是 binding 缺失 → `env.DB` 是 undefined → 抛错
+
+### "Failed to fetch"
+
+CORS 或网络问题。本项目同源后不应该出现此问题。检查：
+
+1. 是不是还指向了已废弃的 `*.workers.dev` 域名（迁移到 Functions 后应该用 `/api`）
+2. 浏览器 console 完整错误
+
+### build 报错 `Configuration file cannot contain both "main" and "pages_build_output_dir"`
+
+`wrangler.toml` 同时有 Worker 用的 `main` 和 Pages 用的 `pages_build_output_dir`。Pages 项目**只支持** `pages_build_output_dir`，删掉 `main` 和 `[build]` 段。
+
+### D1 数据怎么备份
+
+```bash
+wrangler d1 export zlibrary-db --output=backup.sql
+```
+
+KV 没有原生导出。建议本地保留上传的原文件备份。
+
+---
+
+## 资源额度
+
+| 服务 | 免费额度 |
+|------|----------|
+| Pages | 无限请求、无限带宽 |
+| Functions | 10 万次 / 天 |
+| D1 | 5GB 存储、500 万读 / 天、10 万写 / 天 |
+| KV | 1GB 存储、10 万读 / 天、1 万写 / 天 |
+
+个人 / 小型项目完全够用。超出后会返回错误但不会扣费。
+
+---
+
+## 清理（如需回退到旧方案）
+
+如果需要把后端迁回独立的 Worker 项目：
+
+1. 改 `wrangler.toml` 加回 `main = "server/api/worker.ts"`，去掉 `pages_build_output_dir`
+2. 把 `client/src/services/{api,admin}.ts` 的 `API_BASE` 改回带 `https://...workers.dev` 的绝对地址
+3. 部署：`wrangler deploy`（Worker） + `wrangler pages deploy dist`（前端）
+
+但目前 Pages Functions 方案**更省事、免绑卡、避开被墙**，建议保持。

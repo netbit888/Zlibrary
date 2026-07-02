@@ -1,204 +1,182 @@
-# Zlibrary - 数字图书馆
+# Zlibrary · 数字图书馆
 
 一个简洁美观的在线数字图书馆系统，支持书籍浏览、搜索、筛选和管理功能。
+
+🌐 在线演示：https://zlibrary-3lw.pages.dev
 
 ## 技术栈
 
 | 层级 | 技术 | 说明 |
 |------|------|------|
-| **前端** | React 18 + TypeScript | 用户界面框架 |
-| **构建工具** | Vite 6 | 快速开发与构建 |
-| **样式** | Tailwind CSS | 原子化 CSS 方案 |
-| **状态管理** | Zustand | 轻量级状态管理 |
-| **路由** | React Router DOM 7 | SPA 路由方案 |
-| **后端** | Express 5 + Node.js | RESTful API 服务 |
-| **数据库** | SQLite (sql.js) | 嵌入式关系型数据库 |
-| **文件上传** | Multer | multipart/form-data 处理 |
+| **前端** | React 18 + TypeScript | 用户界面 |
+| **构建工具** | Vite 6 | 开发与构建 |
+| **样式** | Tailwind CSS | 原子化 CSS |
+| **状态管理** | Zustand | 轻量级状态 |
+| **路由** | React Router DOM 7 | SPA 路由 |
+| **后端** | Cloudflare Pages Functions | 无服务器 API（与前端同源） |
+| **数据库** | Cloudflare D1 | 兼容 SQLite 的分布式 SQL（5GB 免费） |
+| **文件存储** | Cloudflare KV | 封面与电子书文件（1GB 免费） |
+| **CI/CD** | Cloudflare Pages + GitHub | push 即部署 |
+
+## 架构
+
+```
+用户 → https://zlibrary-3lw.pages.dev (Pages)
+         │
+         ├── /               → 静态前端 (dist/)
+         ├── /api/*          → Pages Functions (functions/api/[[path]].ts)
+         │     ├── Cloudflare D1   → 书籍元数据
+         │     └── Cloudflare KV   → 封面 + 电子书文件
+         └── 自动构建: GitHub push → Cloudflare Pages
+```
+
+**特点**：
+- 前后端同源，无 CORS 问题
+- 全 Cloudflare 生态，**无需绑卡**
+- 单文件上传上限 25MB（KV 限制）
+- 每天 10 万次免费 API 请求
 
 ## 功能特性
 
 ### 读者端
-- **首页浏览**：展示热门推荐书籍和分类标签
-- **智能搜索**：支持按书名、作者、简介关键词搜索
-- **分类筛选**：按分类、文件格式、语言等条件过滤
-- **排序功能**：按相关性、评分、出版时间排序
-- **书籍详情**：查看书籍完整信息、评分、下载量
-- **下载功能**：支持 PDF、EPUB、MOBI 等多种格式
+- 首页热门推荐与分类浏览
+- 按书名 / 作者 / 简介智能搜索
+- 多维度筛选（分类、格式、语言、排序）
+- 书籍详情、评分、下载量
+- 多格式下载（PDF / EPUB / MOBI）
 
 ### 管理端
-- **管理员登录**：简单的密码认证机制
-- **书籍管理**：新增、编辑、删除书籍
-- **文件上传**：批量上传书籍封面和电子书文件
-- **数据分页**：支持管理大量书籍数据
+- 密码认证登录
+- 书籍 CRUD + 分页
+- 封面与电子书文件批量上传
+- 实时管理所有数据
 
-## 快速开始
+## 本地开发
 
 ### 环境要求
-- Node.js >= 18.0.0
-- npm 或 yarn
+- Node.js ≥ 18
+- npm
 
-### 安装依赖
+### 启动
 
 ```bash
+# 1. 安装依赖
 npm install
-```
 
-### 启动开发服务器
-
-```bash
+# 2. 同时启动前端（Vite 5173）和后端（Express 3001）
 npm run dev
 ```
 
-这会同时启动前端开发服务器（Vite）和后端 API 服务（Express）。
+前端：<http://localhost:5173>  
+后端：<http://localhost:3001>
 
-- 前端地址：http://localhost:5173
-- 后端地址：http://localhost:3001
+本地后端用 `server/api/server.ts`（Express + SQLite），数据落在 `data/` 目录，**仅供开发使用**。生产环境用的是 Cloudflare Functions + D1。
 
-### 构建生产版本
-
-```bash
-npm run build
-```
-
-### 类型检查
+### 其他命令
 
 ```bash
-npm run check
+npm run build        # 构建前端到 dist/
+npm run check        # TypeScript 类型检查
+npm run lint         # ESLint 检查
 ```
 
 ## 项目结构
 
 ```
 Zlibrary/
-├── api/                    # 后端代码
-│   ├── server.ts          # Express 服务入口
-│   ├── db.ts              # SQLite 数据库操作
-│   └── data/              # 数据相关文件
-├── src/                    # 前端源代码
-│   ├── components/        # React 组件
-│   │   ├── BookCard.tsx   # 书籍卡片
-│   │   ├── CategoryTag.tsx # 分类标签
-│   │   ├── DownloadButton.tsx # 下载按钮
-│   │   ├── Empty.tsx      # 空状态组件
-│   │   ├── FilterSidebar.tsx # 筛选侧边栏
-│   │   ├── Footer.tsx     # 页脚
-│   │   ├── Header.tsx     # 页头导航
-│   │   ├── SearchBar.tsx  # 搜索栏
-│   │   ├── StarRating.tsx # 星级评分
-│   │   └── Toast.tsx      # 提示消息
-│   ├── pages/             # 页面组件
-│   │   ├── HomePage.tsx   # 首页
-│   │   ├── SearchPage.tsx # 搜索页
-│   │   ├── BookDetailPage.tsx # 书籍详情页
-│   │   ├── AdminPage.tsx  # 管理后台
-│   │   └── AdminLoginPage.tsx # 管理员登录
-│   ├── services/          # API 服务层
-│   │   ├── api.ts         # 公开 API 调用
-│   │   └── admin.ts       # 管理员 API 调用
-│   ├── store/             # 状态管理
-│   │   └── useBookStore.ts # Zustand Store
-│   ├── hooks/             # 自定义 Hooks
-│   │   └── useTheme.ts    # 主题切换
-│   ├── types/             # TypeScript 类型定义
-│   │   └── index.ts       # 类型导出
-│   ├── lib/               # 工具函数
-│   │   └── utils.ts       # 通用工具
-│   ├── App.tsx            # 根组件
-│   ├── main.tsx           # 入口文件
-│   └── index.css          # 全局样式
-├── public/                # 静态资源
-│   ├── covers/            # 书籍封面目录
-│   ├── books/             # 电子书文件目录
-│   └── favicon.svg        # 网站图标
-├── data/                  # 数据存储
-│   └── zlibrary.db        # SQLite 数据库文件
-├── package.json           # 项目配置
-├── vite.config.ts         # Vite 配置
-├── tailwind.config.js     # Tailwind CSS 配置
-└── tsconfig.json          # TypeScript 配置
+├── client/                       # 前端代码
+│   ├── src/
+│   │   ├── components/           # React 组件
+│   │   ├── pages/                # 页面（首页、搜索、详情、管理、登录）
+│   │   ├── services/             # API 调用层
+│   │   │   ├── api.ts            # 公开 API
+│   │   │   └── admin.ts          # 管理员 API
+│   │   ├── store/                # Zustand 状态
+│   │   ├── hooks/                # 自定义 Hooks
+│   │   ├── types/                # TypeScript 类型
+│   │   └── lib/                  # 工具函数
+│   ├── public/                   # 静态资源
+│   └── index.html
+├── server/
+│   ├── api/
+│   │   ├── server.ts             # 本地开发用 Express 后端
+│   │   ├── db.ts                 # 本地 SQLite 操作
+│   │   └── worker.ts             # 共享的 API 逻辑（Worker / Functions 都用）
+├── functions/
+│   └── api/
+│       └── [[path]].ts           # Pages Functions 入口
+├── schema.sql                    # D1 数据库初始化脚本
+├── wrangler.toml                 # Cloudflare 部署配置
+└── package.json
 ```
 
 ## API 接口
+
+所有接口都挂在 `/api/*` 前缀下。生产环境通过 Pages Functions 部署，与前端同源。
 
 ### 公开接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/health` | 健康检查 |
-| GET | `/api/categories` | 获取所有分类 |
-| GET | `/api/books/popular` | 获取热门书籍 |
-| GET | `/api/books/search` | 搜索书籍 |
-| GET | `/api/books/:id` | 获取书籍详情 |
+| GET | `/api/categories` | 所有分类 |
+| GET | `/api/books/popular?limit=8` | 热门书籍 |
+| GET | `/api/books/search?q=&category=&format=&language=&sortBy=&page=&pageSize=` | 搜索书籍 |
+| GET | `/api/books/:id` | 书籍详情 |
+| GET | `/api/books/:id/download/:format` | 下载电子书 |
+| GET | `/api/files/...` | 访问 KV 中的封面 / 文件 |
 
-### 管理员接口
+### 管理员接口（需 `x-admin-token` 请求头）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/admin/login` | 管理员登录 |
-| GET | `/api/admin/books` | 获取书籍列表（需认证） |
-| POST | `/api/admin/books` | 新增书籍（需认证） |
-| PUT | `/api/admin/books/:id` | 更新书籍（需认证） |
-| DELETE | `/api/admin/books/:id` | 删除书籍（需认证） |
-| POST | `/api/admin/upload` | 上传文件（需认证） |
-
-### 认证方式
-
-管理员接口需要通过 `x-admin-token` 请求头传递认证令牌。
+| POST | `/api/admin/login` | 登录（body: `{ password }`） |
+| GET | `/api/admin/books?q=&page=&pageSize=` | 书籍列表 |
+| POST | `/api/admin/books` | 新增书籍 |
+| PUT | `/api/admin/books/:id` | 更新书籍 |
+| DELETE | `/api/admin/books/:id` | 删除书籍 |
+| POST | `/api/admin/upload?type=cover\|book` | 上传文件 |
 
 ## 环境变量
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `PORT` | `3001` | 后端服务端口 |
-| `ADMIN_PASSWORD` | `admin123` | 管理员登录密码 |
+### 本地开发（`.env` 文件）
 
-### 设置环境变量
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `ADMIN_PASSWORD` | `zlibrary` | 管理员密码 |
+| `PORT` | `3001` | 后端端口 |
 
-在项目根目录创建 `.env` 文件：
+### 生产环境（Cloudflare Dashboard → Pages → Settings → Functions → Bindings）
 
-```env
-PORT=3001
-ADMIN_PASSWORD=your_secure_password
-```
+| 类型 | 名称 | 目标 / 值 |
+|------|------|-----------|
+| D1 database | `DB` | `zlibrary-db` |
+| KV namespace | `FILES_KV` | 文件存储命名空间 |
+| Environment variable | `ADMIN_PASSWORD` | `zlibrary`（或自定义） |
 
-## 管理员使用
+> 前端调用 API 时，**生产环境** `API_BASE` 直接用 `/api`（同源）；**开发环境** 通过 Vite proxy 转到 `:3001`。代码里已处理好，无需额外配置。
 
-1. 访问 `/admin/login` 进入管理员登录页面
-2. 输入密码登录（默认密码：`admin`）
-3. 进入管理后台进行书籍管理
+## 部署
 
-### 管理后台功能
+> 详细部署步骤见 [DEPLOY.md](./DEPLOY.md)
 
-- **浏览书籍**：查看所有书籍列表，支持分页
-- **搜索书籍**：按书名或作者搜索
-- **新增书籍**：添加新书籍信息
-- **编辑书籍**：修改现有书籍信息
-- **删除书籍**：移除不需要的书籍
-- **上传文件**：上传书籍封面和电子书文件
+简述：
 
-## 开发指南
+1. 准备 Cloudflare 账号（无需绑卡）
+2. 创建 D1 数据库与 KV 命名空间，把 ID 填入 `wrangler.toml`
+3. 在 Dashboard 配 Pages 项目的 D1 / KV / `ADMIN_PASSWORD` bindings
+4. 把代码推送到 GitHub
+5. 在 Dashboard 连接 GitHub 仓库，选定 production branch
+6. 每次 `git push` 自动 build 并部署到 `https://<project>.pages.dev`
 
-### 添加新的公开 API
+## 管理员登录
 
-1. 在 `api/server.ts` 中添加路由处理函数
-2. 在 `api/db.ts` 中添加数据库操作函数
-3. 在 `src/services/api.ts` 中添加前端调用方法
-4. 在 `src/types/index.ts` 中定义类型（如果需要）
-
-### 添加管理员接口
-
-1. 在 `api/server.ts` 中添加路由，使用 `authAdmin` 中间件保护
-2. 在 `src/services/admin.ts` 中添加前端调用方法
-
-### 自定义样式
-
-- 全局样式：`src/index.css`
-- Tailwind 配置：`tailwind.config.js`
-- 主题颜色在 `tailwind.config.js` 的 `colors` 中定义
+- 路径：`/admin/login`
+- 密码：在 Dashboard 设置的 `ADMIN_PASSWORD`（默认 `zlibrary`）
+- 登录后 token 存到 `localStorage`（key: `zlib_admin_token`），所有管理员请求带 `x-admin-token` 请求头
 
 ## 注意事项
 
-- 数据库文件位于 `data/zlibrary.db`，首次启动时会自动创建并初始化示例数据
-- 上传的书籍封面保存在 `public/covers/` 目录
-- 上传的电子书文件保存在 `public/books/` 目录
-- 这是一个演示/学习项目，认证机制较为简单，不适合直接用于生产环境
+- **单文件 ≤ 25MB**（KV 限制）
+- 项目目前是个人 / 学习用途，认证机制简单，不建议直接用于商业生产
+- 数据存储在 Cloudflare 全球边缘节点，删除后**无法直接恢复**（KV 没有原生导出），重要文件请在本地保留备份
