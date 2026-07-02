@@ -5,17 +5,11 @@ compatibility_date = "2024-07-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "zlibrary-db"
-database_id = "your-database-id-here"
+database_id = "7a68473e-bc68-469d-86e4-8497e42e048c"
 
 [[kv_namespaces]]
 binding = "FILES_KV"
-id = "your-kv-namespace-id-here"
+id = "1d889dcad2404b04aa9154ced57aa2c3"
 
 [vars]
 ADMIN_PASSWORD = "zlibrary"
-
-[build]
-command = "npm install"
-
-[env.production]
-vars = { ADMIN_PASSWORD = "zlibrary" }
