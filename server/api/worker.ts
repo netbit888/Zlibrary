@@ -109,7 +109,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
         const urlKey = `${format}_url`;
         const fileUrl = book[urlKey];
         if (!fileUrl) return json({ error: '该格式文件不存在' }, 404);
-        const key = fileUrl.replace(/^\//, '');
+        const key = fileUrl.replace(/^\/api\/files\//, '');
         const file = await readFileFromKV(key, env);
         if (!file) return json({ error: '文件不存在' }, 404);
         await env.DB.prepare('UPDATE books SET downloads = downloads + 1 WHERE id = ?').bind(id).run();
