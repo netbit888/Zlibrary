@@ -55,9 +55,11 @@ export default function DownloadButton({ formats, title, bookId, pdf_url, epub_u
       a.download = `${title}.${fmt}`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
-      addToast(`《${title}》${formatLabels[fmt as keyof typeof formatLabels]} 下载已完成`, "success");
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 1000);
+      addToast(`《${title}》${formatLabels[fmt as keyof typeof formatLabels]} 已开始下载，请在浏览器下载栏查看进度`, "success");
     } catch (err: any) {
       addToast(err.message || "下载失败", "error");
     } finally {
