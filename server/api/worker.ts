@@ -258,6 +258,25 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 
       if (path.match(/^\/api\/admin\/books\/[\w-]+$/) && method === 'DELETE') {
         const id = path.split('/').pop();
+        const book = await env.DB.prepare('SELECT * FROM books WHERE id = ?').bind(id).first() as any;
+        if (book) {
+          if (book.cover) {
+            const coverKey = book.cover.replace(/^\/api\/files\//, '');
+            await env.FILES_KV.delete(coverKey).catch(() => {});
+          }
+          if (book.pdf_url) {
+            const pdfKey = book.pdf_url.replace(/^\/api\/files\//, '');
+            await env.FILES_KV.delete(pdfKey).catch(() => {});
+          }
+          if (book.epub_url) {
+            const epubKey = book.epub_url.replace(/^\/api\/files\//, '');
+            await env.FILES_KV.delete(epubKey).catch(() => {});
+          }
+          if (book.mobi_url) {
+            const mobiKey = book.mobi_url.replace(/^\/api\/files\//, '');
+            await env.FILES_KV.delete(mobiKey).catch(() => {});
+          }
+        }
         await env.DB.prepare('DELETE FROM books WHERE id = ?').bind(id).run();
         return json({ success: true });
       }
@@ -320,7 +339,8 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
             ext = typeToExt[contentType] || '';
           }
           if (!ext) ext = 'bin';
-          const filename = `${Date.now()}_${Math.round(Math.random() * 1e9)}.${ext}`;
+          const safeName = finalFileName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5._-]/g, '_');
+          const filename = `${Date.now()}_${safeName}`;
           const prefix = type === 'book' ? 'books' : 'covers';
           const key = `${prefix}/${filename}`;
 
