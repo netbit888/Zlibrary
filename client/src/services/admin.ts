@@ -89,13 +89,15 @@ export async function adminDeleteBook(id: string): Promise<{ success: boolean }>
 }
 
 export async function adminUploadFile(file: File, type: "cover" | "book"): Promise<{ url: string; filename: string; size: number }> {
-  const formData = new FormData();
-  formData.append("file", file);
   const token = getAdminToken();
-  const res = await fetch(API_BASE + "/admin/upload?type=" + type, {
+  const arrayBuffer = await file.arrayBuffer();
+  const res = await fetch(API_BASE + "/admin/upload?type=" + type + "&name=" + encodeURIComponent(file.name), {
     method: "POST",
-    headers: token ? { "x-admin-token": token } : {},
-    body: formData,
+    headers: {
+      ...(token ? { "x-admin-token": token } : {}),
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    body: arrayBuffer,
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

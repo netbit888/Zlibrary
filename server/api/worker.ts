@@ -20,9 +20,17 @@ function json(data: any, status: number = 200): Response {
 async function readFileFromKV(key: string, env: Env): Promise<{ body: ArrayBuffer; contentType: string } | null> {
   const file = await env.FILES_KV.get(key, { type: 'arrayBuffer' });
   if (!file) return null;
-  const meta = await env.FILES_KV.getWithMetadata(key);
-  const contentType = (meta?.metadata as any)?.contentType || 'application/octet-stream';
-  return { body: file, contentType };
+  
+  let contentType = 'application/octet-stream';
+  try {
+    const meta = await env.FILES_KV.getWithMetadata(key);
+    if (meta && meta.metadata) {
+      contentType = (meta.metadata as any).contentType || 'application/octet-stream';
+    }
+  } catch (e) {
+  }
+  
+  return { body: file as ArrayBuffer, contentType };
 }
 
 export async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -40,7 +48,23 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
     try {
       // ========== 健康检查 ==========
       if (path === '/api/health') {
-        return json({ status: 'ok', db: 'd1', storage: 'kv' });
+        const kvKeys = await env.FILES_KV.list({ prefix: '' });
+        return json({ 
+          status: 'ok', 
+          db: 'd1', 
+          storage: 'kv',
+          kvFileCount: kvKeys.keys.length,
+          kvKeys: kvKeys.keys.slice(0, 20).map(k => k.name)
+        });
+      }
+
+      if (path === '/api/debug/file' && method === 'GET') {
+        const key = url.searchParams.get('key');
+        if (!key) return json({ error: '请提供 key 参数' }, 400);
+        const exists = await env.FILES_KV.get(key, { type: 'arrayBuffer' });
+        if (!exists) return json({ key, exists: false });
+        const meta = await env.FILES_KV.getWithMetadata(key);
+        return json({ key, exists: true, contentType: (meta?.metadata as any)?.contentType, size: exists.byteLength });
       }
 
       // ========== 公开接口 ==========
@@ -64,10 +88,11 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
       if (path.startsWith('/api/files/')) {
         const key = decodeURIComponent(path.replace('/api/files/', ''));
         const file = await readFileFromKV(key, env);
-        if (!file) return json({ error: '文件不存在' }, 404);
+        if (!file) return json({ error: '文件不存在: ' + key }, 404);
         return new Response(file.body, {
           headers: {
             'Content-Type': file.contentType,
+            'Content-Length': String(file.body.byteLength),
             'Cache-Control': 'public, max-age=31536000',
             ...corsHeaders,
           },
@@ -238,27 +263,75 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
       }
 
       if (path === '/api/admin/upload' && method === 'POST') {
-        const formData = await request.formData();
-        const file = formData.get('file') as File;
-        const type = url.searchParams.get('type') || 'cover';
+        try {
+          const type = url.searchParams.get('type') || 'cover';
+          const fileName = decodeURIComponent(url.searchParams.get('name') || '');
+          let contentType = request.headers.get('Content-Type') || 'application/octet-stream';
 
-        if (!file) return json({ error: '未上传文件' }, 400);
+          const fileBytes = await request.arrayBuffer();
+          const fileSize = fileBytes.byteLength;
 
-        const MAX_SIZE = 25 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return json({ error: `文件超过 25MB 限制（当前 ${(file.size / 1024 / 1024).toFixed(2)}MB）` }, 413);
+          if (fileSize === 0) return json({ error: '未上传文件' }, 400);
+
+          let finalFileName = fileName;
+          if (!finalFileName && type === 'cover') {
+            finalFileName = 'cover.jpg';
+            contentType = 'image/jpeg';
+          } else if (!finalFileName && type === 'book') {
+            finalFileName = 'book.pdf';
+            contentType = 'application/pdf';
+          }
+
+          if (finalFileName && finalFileName.includes('.')) {
+            const nameLower = finalFileName.toLowerCase();
+            if (nameLower.endsWith('.jpg') || nameLower.endsWith('.jpeg')) {
+              contentType = 'image/jpeg';
+            } else if (nameLower.endsWith('.png')) {
+              contentType = 'image/png';
+            } else if (nameLower.endsWith('.gif')) {
+              contentType = 'image/gif';
+            } else if (nameLower.endsWith('.webp')) {
+              contentType = 'image/webp';
+            } else if (nameLower.endsWith('.pdf')) {
+              contentType = 'application/pdf';
+            } else if (nameLower.endsWith('.epub')) {
+              contentType = 'application/epub+zip';
+            } else if (nameLower.endsWith('.mobi')) {
+              contentType = 'application/x-mobipocket-ebook';
+            }
+          }
+
+          const MAX_SIZE = 25 * 1024 * 1024;
+          if (fileSize > MAX_SIZE) {
+            return json({ error: `文件超过 25MB 限制（当前 ${(fileSize / 1024 / 1024).toFixed(2)}MB）` }, 413);
+          }
+
+          let ext = (finalFileName || '').split('.').pop()?.toLowerCase() || '';
+          if (!ext && contentType) {
+            const typeToExt: Record<string, string> = {
+              'image/jpeg': 'jpg',
+              'image/png': 'png',
+              'image/gif': 'gif',
+              'image/webp': 'webp',
+              'application/pdf': 'pdf',
+              'application/epub+zip': 'epub',
+              'application/x-mobipocket-ebook': 'mobi',
+            };
+            ext = typeToExt[contentType] || '';
+          }
+          if (!ext) ext = 'bin';
+          const filename = `${Date.now()}_${Math.round(Math.random() * 1e9)}.${ext}`;
+          const prefix = type === 'book' ? 'books' : 'covers';
+          const key = `${prefix}/${filename}`;
+
+          await env.FILES_KV.put(key, fileBytes, {
+            metadata: { contentType, originalName: finalFileName },
+          });
+
+          return json({ url: `/api/files/${prefix}/${filename}`, filename, size: fileBytes.byteLength, key, contentType });
+        } catch (err: any) {
+          return json({ error: '上传异常: ' + err.message, stack: err.stack }, 500);
         }
-
-        const ext = file.name.split('.').pop()?.toLowerCase() || '';
-        const filename = `${Date.now()}_${Math.round(Math.random() * 1e9)}.${ext}`;
-        const prefix = type === 'book' ? 'books' : 'covers';
-        const key = `${prefix}/${filename}`;
-
-        await env.FILES_KV.put(key, file.stream(), {
-          metadata: { contentType: file.type, originalName: file.name },
-        });
-
-        return json({ url: `/api/files/${prefix}/${filename}`, filename, size: file.size });
       }
 
       return new Response('Not Found', { status: 404, headers: corsHeaders });

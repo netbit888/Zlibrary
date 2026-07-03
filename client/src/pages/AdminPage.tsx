@@ -158,8 +158,10 @@ export default function AdminPage() {
     setUploadingCover(true);
     try {
       const res = await adminUploadFile(file, "cover");
+      console.log("上传封面成功:", res);
       setForm((prev) => ({ ...prev, cover: res.url }));
     } catch (err: any) {
+      console.error("上传封面失败:", err);
       alert(err.message);
     } finally {
       setUploadingCover(false);
@@ -172,7 +174,8 @@ export default function AdminPage() {
     setUploadingBook(true);
     try {
       const res = await adminUploadFile(file, "book");
-      const ext = file.name.split(".").pop()?.toLowerCase();
+      console.log("上传电子书成功:", res);
+      const ext = (file.name || "").split(".").pop()?.toLowerCase();
       if (ext && ["pdf", "epub", "mobi"].includes(ext)) {
         const urlKey = `${ext}_url`;
         setForm((prev) => ({
