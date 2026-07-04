@@ -60,6 +60,47 @@ function createTables() {
     );
   `);
 
+  // 用户表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      username TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
+      avatar TEXT,
+      bio TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login DATETIME
+    );
+  `);
+
+  // 用户喜欢的书籍表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_favorites (
+      user_id INTEGER NOT NULL,
+      book_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, book_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+    );
+  `);
+
+  // 用户下载历史表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_downloads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      book_id INTEGER NOT NULL,
+      format TEXT NOT NULL,
+      downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+    );
+  `);
+
   // 如果旧表没有新字段，添加它们
   try {
     db.run("ALTER TABLE books ADD COLUMN pdf_url TEXT");
@@ -71,7 +112,7 @@ function createTables() {
     db.run("ALTER TABLE books ADD COLUMN mobi_url TEXT");
   } catch {}
 
-  console.log("[DB] 表结构已创建");
+  console.log("[DB] 所有表结构已创建");
 }
 
 function seedData() {
@@ -329,4 +370,118 @@ export function incrementDownloads(id: string): boolean {
   stmt.free();
   saveDb();
   return true;
+}
+
+// ==================== 用户相关函数 ====================
+
+// 创建新用户
+export function createUser(email: string, username: string, passwordHash: string, role: string = 'user'): { id: string; success: boolean } {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO users (email, username, password_hash, role)
+      VALUES (?, ?, ?, ?)
+    `);
+    const result = stmt.run(email, username, passwordHash, role);
+    stmt.free();
+    saveDb();
+    return { id: result.lastInsertRowid.toString(), success: true };
+  } catch (error: any) {
+    if (error.message.includes('UNIQUE constraint failed: users.email')) {
+      throw new Error('该邮箱已被注册');
+    }
+    throw error;
+  }
+}
+
+// 通过邮箱查找用户
+export function findUserByEmail(email: string): any {
+  const stmt = db.prepare("SELECT * FROM users WHERE email = ?");
+  const result = stmt.getAsObject([email]);
+  stmt.free();
+  
+  if (!result || !result.id) return null;
+  
+  const cols = ["id", "email", "username", "password_hash", "role", "avatar", "bio", "created_at", "updated_at", "last_login"];
+  const row = cols.map((c) => result[c]);
+  
+  return rowToUser(row);
+}
+
+// 通过ID查找用户
+export function findUserById(id: string): any {
+  const stmt = db.prepare("SELECT * FROM users WHERE id = ?");
+  const result = stmt.getAsObject([id]);
+  stmt.free();
+  
+  if (!result || !result.id) return null;
+  
+  const cols = ["id", "email", "username", "password_hash", "role", "avatar", "bio", "created_at", "updated_at", "last_login"];
+  const row = cols.map((c) => result[c]);
+  
+  return rowToUser(row);
+}
+
+// 更新用户最后登录时间
+export function updateUserLastLogin(id: string): void {
+  const stmt = db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
+  stmt.run([id]);
+  stmt.free();
+  saveDb();
+}
+
+// 更新用户资料
+export function updateUserProfile(id: string, updates: { username?: string; bio?: string; avatar?: string }): { success: boolean } {
+  const fields: string[] = [];
+  const values: any[] = [];
+  
+  if (updates.username !== undefined) {
+    fields.push("username = ?");
+    values.push(updates.username);
+  }
+  if (updates.bio !== undefined) {
+    fields.push("bio = ?");
+    values.push(updates.bio);
+  }
+  if (updates.avatar !== undefined) {
+    fields.push("avatar = ?");
+    values.push(updates.avatar);
+  }
+  
+  if (fields.length === 0) {
+    return { success: false };
+  }
+  
+  fields.push("updated_at = CURRENT_TIMESTAMP");
+  values.push(id);
+  
+  const query = `UPDATE users SET ${fields.join(", ")} WHERE id = ?`;
+  const stmt = db.prepare(query);
+  stmt.run(values);
+  stmt.free();
+  saveDb();
+  
+  return { success: true };
+}
+
+// 数据库行转换为用户对象
+function rowToUser(row: any[]): any {
+  return {
+    id: String(row[0]),
+    email: row[1],
+    username: row[2],
+    passwordHash: row[3],
+    role: row[4],
+    avatar: row[5] || null,
+    bio: row[6] || null,
+    createdAt: row[7],
+    updatedAt: row[8],
+    lastLogin: row[9] || null,
+  };
+}
+
+// 获取所有用户（管理员用）
+export function getAllUsers(): any[] {
+  const res = db.exec("SELECT * FROM users ORDER BY created_at DESC");
+  if (res.length === 0) return [];
+  return res[0].values.map((row: any) => rowToUser(row));
 }

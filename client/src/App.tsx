@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import Header from "@/components/Header";
@@ -9,6 +10,12 @@ import BookDetailPage from "@/pages/BookDetailPage";
 import AdminPage from "@/pages/AdminPage";
 import AdminLoginPage from "@/pages/AdminLoginPage";
 
+// Lazy-load pages for better performance
+const LazyAdminPage = lazy(() => import("@/pages/AdminPage"));
+const LazyAdminLoginPage = lazy(() => import("@/pages/AdminLoginPage"));
+const LazyAuthLoginPage = lazy(() => import("@/pages/AuthLoginPage"));
+const LazyUserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
+
 function TitleUpdater() {
   const location = useLocation();
   useEffect(() => {
@@ -17,6 +24,8 @@ function TitleUpdater() {
       "/search": "搜索结果 - Zlibrary",
       "/admin": "管理后台 - Zlibrary",
       "/admin/login": "登录 - Zlibrary",
+      "/auth/login": "用户登录 - Zlibrary",
+      "/profile": "用户资料 - Zlibrary",
     };
     let title = titles[location.pathname] || "Zlibrary";
     if (location.pathname.startsWith("/book/")) {
@@ -32,8 +41,26 @@ export default function App() {
     <Router>
       <TitleUpdater />
       <Routes>
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/login" element={(
+          <Suspense fallback={<div>加载中...</div>}>
+            <LazyAdminLoginPage />
+          </Suspense>
+        )} />
+        <Route path="/admin" element={(
+          <Suspense fallback={<div>加载中...</div>}>
+            <LazyAdminPage />
+          </Suspense>
+        )} />
+        <Route path="/auth/login" element={(
+          <Suspense fallback={<div>加载中...</div>}>
+            <LazyAuthLoginPage />
+          </Suspense>
+        )} />
+        <Route path="/profile" element={(
+          <Suspense fallback={<div>加载中...</div>}>
+            <LazyUserProfilePage />
+          </Suspense>
+        )} />
         <Route
           path="*"
           element={

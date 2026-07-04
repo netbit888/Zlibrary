@@ -26,6 +26,8 @@ import {
   incrementDownloads,
 } from "./db.js";
 
+import * as auth from './simple-auth.js';
+
 const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "client", "public");
 const DIST_DIR = path.resolve(__dirname, "..", "..", "dist");
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data");
@@ -229,6 +231,72 @@ app.post("/api/admin/upload", authAdmin, upload.single("file"), (req, res) => {
   const type = (req.query as any).type || "cover";
   const url = type === "book" ? `/books/${req.file.filename}` : `/covers/${req.file.filename}`;
   res.json({ url, filename: req.file.filename, size: req.file.size });
+});
+
+// ========== 用户认证接口 ==========
+
+// 用户注册
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { email, username, password } = req.body;
+    
+    if (!email || !username || !password) {
+      return res.status(400).json({ success: false, message: "请填写所有必填字段" });
+    }
+    
+    const user = await auth.registerUser(email, username, password);
+    
+    // 自动登录，返回token
+    const result = await auth.loginUser(email, password);
+    
+    res.json({
+      success: true,
+      token: result.token,
+      user: result.user
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+// 用户登录
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: "请填写邮箱和密码" });
+    }
+    
+    const result = await auth.loginUser(email, password);
+    
+    res.json({
+      success: true,
+      token: result.token,
+      user: result.user
+    });
+  } catch (error: any) {
+    res.status(401).json({ success: false, message: error.message });
+  }
+});
+
+// 获取当前用户信息（需要认证）
+app.get("/api/auth/profile", auth.authenticate, async (req, res) => {
+  try {
+    const user = await auth.getUserInfo(req.user.userId);
+    res.json(user);
+  } catch (error: any) {
+    res.status(404).json({ success: false, message: error.message });
+  }
+});
+
+// 验证token是否有效
+app.get("/api/auth/verify", auth.authenticate, (req, res) => {
+  res.json({
+    success: true,
+    userId: req.user.userId,
+    role: req.user.role
+  });
 });
 
 // SPA fallback - 必须在所有 API 路由之后
